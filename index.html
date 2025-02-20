@@ -1,0 +1,309 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SP player</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; /* Modern font */
+            margin: 0;
+            display: flex;
+            height: 100vh;
+            overflow: hidden;
+            background-color: #282c34; /* Darker, modern background */
+            color: #e0e0e0; /* Lighter text color */
+        }
+
+        #player-container {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+        }
+
+        #media-player {
+            flex: 1;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            position: relative;
+            background-color: #1e2127; /* Slightly darker player background */
+        }
+
+        video, audio {
+            max-width: 100%;
+            max-height: 100%;
+        }
+
+        #controls {
+            background-color: #3d424e; /* Darker control background */
+            padding: 10px;
+            display: flex;
+            justify-content: center;
+            border-top: 1px solid #555; /* Subtle separator */
+        }
+
+        #controls button {
+            margin: 0 8px; /* Increased margin */
+            padding: 10px 18px; /* Increased padding */
+            border: none;
+            background-color: #61afef; /* Brighter, modern color */
+            color: #fff;
+            cursor: pointer;
+            border-radius: 5px;
+            transition: background-color 0.2s, transform 0.1s; /* Added transform */
+            font-weight: 500; /* Slightly bolder font */
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2); /* Subtle shadow */
+        }
+
+        #controls button:hover {
+            background-color: #4aa1d4; /* Darker hover color */
+            transform: scale(1.02); /* Scale on hover */
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.25); /* More prominent shadow */
+        }
+
+        #controls button:active {
+            transform: scale(0.98); /* Scale down on click */
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.15); /* Reduced shadow */
+        }
+
+        #playlist-sidebar {
+            width: 350px; /* Increased width */
+            background-color: #333842; /* Darker sidebar */
+            color: #fff;
+            padding: 15px; /* Increased padding */
+            overflow-y: auto;
+            border-left: 1px solid #555;
+        }
+
+        #playlist-sidebar h2 {
+            margin-top: 0;
+            color: #ddd;
+            font-size: 1.2em; /* Slightly larger heading */
+            margin-bottom: 10px; /* Added margin */
+        }
+
+        #playlist-sidebar ul {
+            list-style: none;
+            padding: 0;
+        }
+
+        #playlist-sidebar li {
+            display: flex;
+            align-items: center;
+            padding: 10px 8px; /* Increased padding */
+            cursor: pointer;
+            transition: background-color 0.2s;
+            border-bottom: 1px solid #444; /* Added separator */
+        }
+
+        #playlist-sidebar li:hover {
+            background-color: #444;
+        }
+
+        #playlist-sidebar li.active {
+            color: #61afef; /* Highlight active track */
+        }
+
+        #playlist li span {
+            flex-grow: 1;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+
+        #playlist li button {
+            margin-left: 8px; /* Increased margin */
+            padding: 6px 12px; /* Increased padding */
+            border: none;
+            background-color: #777;
+            color: #eee;
+            cursor: pointer;
+            border-radius: 3px;
+            transition: background-color 0.2s; /* Added transition */
+
+        }
+        #playlist li button:hover {
+            background-color: #999;
+        }
+    </style>
+</head>
+<body>
+    <div id="player-container">
+        <div id="media-player">
+            <video id="video-player" controls style="display: none;"></video>
+            <audio id="audio-player" controls style="display: none;"></audio>
+        </div>
+        <div id="controls">
+            <button id="play-pause">Play</button>
+            <button id="next">Next</button>
+            <button id="open-file">Open File</button>
+        </div>
+    </div>
+    <div id="playlist-sidebar">
+        <h2>Playlist</h2>
+        <ul id="playlist"></ul>
+    </div>
+
+    <script>
+        const videoPlayer = document.getElementById('video-player');
+        const audioPlayer = document.getElementById('audio-player');
+        const playPauseButton = document.getElementById('play-pause');
+        const nextButton = document.getElementById('next');
+        const playlist = document.getElementById('playlist');
+        const openFileButton = document.getElementById('open-file');
+        let currentMedia;
+        let mediaFiles = [];
+        let currentTrackIndex = 0;
+        let currentMediaElement;
+
+        openFileButton.addEventListener('click', () => {
+            const input = document.createElement('input');
+            input.type = 'file';
+            input.multiple = true;
+            input.accept = "video/*, audio/*";
+
+            input.addEventListener('change', () => {
+                handleFiles(input.files);
+            });
+            input.click();
+        });
+
+        document.addEventListener('dragover', (e) => {
+            e.preventDefault();
+        });
+
+        document.addEventListener('drop', (e) => {
+            e.preventDefault();
+            handleFiles(e.dataTransfer.files);
+        });
+
+        function handleFiles(files) {
+            for (const file of files) {
+                mediaFiles.push(file);
+                const listItem = document.createElement('li');
+                const span = document.createElement('span');
+                span.textContent = file.name;
+                listItem.appendChild(span);
+
+                const removeButton = document.createElement('button');
+                removeButton.textContent = 'X';
+                removeButton.addEventListener('click', (event) => {
+                    event.stopPropagation(); // Prevent playMedia from being called
+                    removeFile(file);
+                });
+                listItem.appendChild(removeButton);
+
+                listItem.addEventListener('click', (event) => {
+                    if (event.target !== removeButton) { // Check if the target is NOT the remove button
+                        playMedia(mediaFiles.indexOf(file));
+                    }
+                });
+
+
+                playlist.appendChild(listItem);
+            }
+            if (!currentMedia && mediaFiles.length > 0) {
+                playMedia(0);
+            }
+        }
+
+        function removeFile(file) {
+            const index = mediaFiles.indexOf(file);
+            if (index > -1) {
+                mediaFiles.splice(index, 1);
+                playlist.removeChild(playlist.childNodes[index]);
+                if (currentMedia === file) {
+                    currentMedia = null;
+                    if (currentMediaElement) { // Check if currentMediaElement exists
+                        currentMediaElement.pause();
+                        currentMediaElement.style.display = 'none';
+                        currentMediaElement.src = '';
+                    }
+                    if (mediaFiles.length > 0) {
+                        playMedia(0);
+                    }
+                } else if (index < currentTrackIndex) {
+                    currentTrackIndex--;
+                }
+            }
+            if (mediaFiles.length === 0) {
+                currentMedia = null;  // Reset currentMedia when playlist is empty
+                if (currentMediaElement) {
+                  currentMediaElement.pause();
+                  currentMediaElement.style.display = 'none';
+                  currentMediaElement.src = '';
+                }
+            }
+        }
+
+        function playMedia(index) {
+            if (index < 0 || index >= mediaFiles.length) return;
+
+            currentTrackIndex = index;
+            currentMedia = mediaFiles[index];
+
+            if (currentMediaElement) { // Pause and clear previous media
+                currentMediaElement.pause();
+                currentMediaElement.style.display = 'none';
+                currentMediaElement.src = '';
+                currentMediaElement.removeEventListener('ended', playNext); // Important!
+            }
+
+            const fileURL = URL.createObjectURL(currentMedia);
+            const mediaType = currentMedia.type.startsWith('video/') ? 'video' : 'audio';
+
+            if (mediaType === 'video') {
+                videoPlayer.src = fileURL;
+                videoPlayer.style.display = 'block';
+                audioPlayer.style.display = 'none';
+                currentMediaElement = videoPlayer;
+            } else {
+                audioPlayer.src = fileURL;
+                audioPlayer.style.display = 'block';
+                videoPlayer.style.display = 'none';
+                currentMediaElement = audioPlayer;
+            }
+
+            currentMediaElement.load();
+            currentMediaElement.play();
+            playPauseButton.textContent = 'Pause';
+
+            const playlistItems = playlist.querySelectorAll('li');
+            playlistItems.forEach((item, i) => {
+                item.classList.toggle('active', i === currentTrackIndex);
+            });
+
+            currentMediaElement.addEventListener('ended', playNext);
+        }
+
+        playPauseButton.addEventListener('click', () => {
+          if (currentMediaElement) {
+              if (currentMediaElement.paused) {
+                  currentMediaElement.play();
+                  playPauseButton.textContent = 'Pause';
+              } else {
+                  currentMediaElement.pause();
+                  playPauseButton.textContent = 'Play';
+              }
+          }
+        });
+
+        nextButton.addEventListener('click', playNext);
+
+        function playNext() {
+            if (mediaFiles.length === 0) return; // Prevent error if playlist is empty
+
+            currentTrackIndex = (currentTrackIndex + 1) % mediaFiles.length;
+            playMedia(currentTrackIndex);
+        }
+
+        videoPlayer.addEventListener('loadeddata', () => {
+        });
+
+        audioPlayer.addEventListener('loadeddata', () => {
+        });
+
+    </script>
+</body>
+</html>
